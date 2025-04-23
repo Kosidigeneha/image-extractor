@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document Image Extractor</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+</head>
+<body class="bg-gray-100 min-h-screen p-8">
+    <div class="max-w-4xl mx-auto">
+        <h1 class="text-3xl font-bold mb-8">Document Image Extractor</h1>
+        
+        <div class="bg-white rounded-lg shadow p-6 mb-8">
+            <form id="uploadForm" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Upload Document (PDF/DOCX/DOC/PPTX)</label>
+                    
+                    <!-- Update the file input accept attribute -->
+                    <input type="file" id="fileInput" accept=".pdf,.doc,.docx,.pptx" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm">
+                </div>
+                
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Start Page</label>
+                        <input type="number" id="startPage" min="1" value="1" 
+                               class="mt-1 block w-full border-gray-300 rounded-md shadow-sm">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">End Page</label>
+                        <input type="number" id="endPage" min="1" 
+                               class="mt-1 block w-full border-gray-300 rounded-md shadow-sm">
+                    </div>
+                </div>
+                
+                <button type="submit" id="extractButton" class="w-full bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">
+                    Extract Images
+                </button>
+            </form>
+        </div>
+        <!-- Conversion Overlay -->
+        <div id="conversionOverlay" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div class="bg-white p-6 rounded-lg shadow-xl text-center">
+                <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                <p class="text-lg font-semibold">Converting Document...</p>
+                <p class="text-sm text-gray-600">Please wait while we convert your document. This may take a few seconds.</p>
+            </div>
+        </div>
+
+        <!-- Processing Overlay -->
+        <div id="processingOverlay" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div class="bg-white p-6 rounded-lg shadow-xl text-center">
+                <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                <p class="text-lg font-semibold">Processing Document...</p>
+                <p class="text-sm text-gray-600">Please wait while we extract the images.</p>
+            </div>
+        </div>
+        
+        <div id="results" class="space-y-8 hidden">
+            <div class="bg-white rounded-lg shadow p-6">
+                <h2 class="text-xl font-semibold mb-4">Extracted Images</h2>
+                <div id="imageGrid" class="grid grid-cols-2 md:grid-cols-3 gap-4"></div>
+                
+                <div class="mt-6 pt-6 border-t">
+                    <h3 class="text-lg font-medium mb-3">Export Options</h3>
+                    <div class="space-y-3">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Images per page/slide</label>
+                            <input type="number" id="imagesPerPage" min="1" max="8" value="1" 
+                                   class="mt-1 block w-full border-gray-300 rounded-md shadow-sm">
+                        </div>
+                        <div class="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-4">
+                            <button onclick="convertImages('pdf')" 
+                                    class="flex-1 bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700">
+                                Export to PDF
+                            </button>
+                            <button onclick="convertImages('pptx')"
+                                    class="flex-1 bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700">
+                                Export to PowerPoint
+                            </button>
+                            <button onclick="convertImages('zip')"
+                                    class="flex-1 bg-yellow-600 text-white px-4 py-2 rounded-md hover:bg-yellow-700">
+                                Download as ZIP
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let extractedImages = [];
+        
+        // Handle file selection and get page count
+        document.getElementById('fileInput').addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            
+            const formData = new FormData();
+            formData.append('file', file);
+            
+            try {
+                const response = await fetch('/api/get-page-count', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const data = await response.json();
+                
+                if (data.error) {
+                    alert(data.error);
+                    return;
+                }
+                
+                // Update the end page input with the total page count
+                const endPageInput = document.getElementById('endPage');
+                endPageInput.value = data.pageCount;
+                endPageInput.max = data.pageCount;
+                
+                // Also update the start page input's max value
+                const startPageInput = document.getElementById('startPage');
+                startPageInput.max = data.pageCount;
+            } catch (error) {
+                console.error('Error getting page count:', error);
+            }
+        });
+        document.getElementById('fileInput').addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    
+    const fileType = file.name.split('.').pop().toLowerCase();
+    const conversionOverlay = document.getElementById('conversionOverlay');
+    
+    if (fileType === 'doc' || fileType === 'docx') {
+        conversionOverlay.classList.remove('hidden');
+    }
+    
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    try {
+        const response = await fetch('/api/get-page-count', {
+            method: 'POST',
+            body: formData
+        });
+        
+        const data = await response.json();
+        
+        if (data.error) {
+            alert(data.error);
+            return;
+        }
+        
+        const endPageInput = document.getElementById('endPage');
+        endPageInput.value = data.pageCount;
+        endPageInput.max = data.pageCount;
+        
+        const startPageInput = document.getElementById('startPage');
+        startPageInput.max = data.pageCount;
+    } catch (error) {
+        console.error('Error getting page count:', error);
+    } finally {
+        conversionOverlay.classList.add('hidden');
+    }
+});
+        // Handle page range validation
+        document.getElementById('startPage').addEventListener('change', function() {
+            const endPage = document.getElementById('endPage');
+            if (parseInt(this.value) > parseInt(endPage.value)) {
+                endPage.value = this.value;
+            }
+        });
+
+        document.getElementById('endPage').addEventListener('change', function() {
+            const startPage = document.getElementById('startPage');
+            if (parseInt(this.value) < parseInt(startPage.value)) {
+                this.value = startPage.value;
+            }
+        });
+
+        // Handle form submission and image extraction
+        document.getElementById('uploadForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const fileInput = document.getElementById('fileInput');
+            const startPage = document.getElementById('startPage').value.trim();
+            const endPage = document.getElementById('endPage').value.trim();
+            const extractButton = document.getElementById('extractButton');
+            const processingOverlay = document.getElementById('processingOverlay');
+            
+            if (!fileInput.files[0]) {
+                alert('Please select a file');
+                return;
+            }
+            
+            // Show processing overlay and disable button
+            processingOverlay.classList.remove('hidden');
+            extractButton.disabled = true;
+            extractButton.classList.add('opacity-50', 'cursor-not-allowed');
+            
+            const formData = new FormData();
+            formData.append('file', fileInput.files[0]);
+            
+            if (startPage) {
+                formData.append('startPage', startPage);
+            }
+            if (endPage) {
+                formData.append('endPage', endPage);
+            }
+            
+            try {
+                const response = await fetch('/api/extract-images', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const data = await response.json();
+                
+                if (data.error) {
+                    alert(data.error);
+                    return;
+                }
+                
+                extractedImages = data.images;
+                displayImages(data.images);
+            } catch (error) {
+                alert('Error extracting images');
+                console.error(error);
+            } finally {
+                // Hide processing overlay and re-enable button
+                processingOverlay.classList.add('hidden');
+                extractButton.disabled = false;
+                extractButton.classList.remove('opacity-50', 'cursor-not-allowed');
+            }
+        });
+
+        // Display extracted images
+        function displayImages(images) {
+            const grid = document.getElementById('imageGrid');
+            const results = document.getElementById('results');
+            
+            grid.innerHTML = '';
+            
+            if (images.length === 0) {
+                grid.innerHTML = `
+                    <div class="col-span-full text-center py-8 text-gray-500">
+                        No images found in the selected page range.
+                    </div>
+                `;
+            } else {
+                images.forEach((image) => {
+                    const div = document.createElement('div');
+                    div.className = 'relative aspect-square';
+                    
+                    const img = document.createElement('img');
+                    img.src = image.data;
+                    img.className = 'w-full h-full object-contain border rounded';
+                    
+                    if (image.page) {
+                        const badge = document.createElement('div');
+                        badge.className = 'absolute top-2 right-2 bg-blue-600 text-white px-2 py-1 rounded text-sm';
+                        badge.textContent = `Page ${image.page}`;
+                        div.appendChild(badge);
+                    }
+                    
+                    div.appendChild(img);
+                    grid.appendChild(div);
+                });
+            }
+            
+            results.classList.remove('hidden');
+        }
+
+        // Handle image conversion and export
+        async function convertImages(format) {
+            if (!extractedImages.length) {
+                alert('No images to export');
+                return;
+            }
+            
+            const processingOverlay = document.getElementById('processingOverlay');
+            processingOverlay.classList.remove('hidden');
+            
+            const imagesPerPage = document.getElementById('imagesPerPage').value;
+            
+            try {
+                const response = await fetch('/api/convert', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        images: extractedImages,
+                        format: format,
+                        imagesPerPage: imagesPerPage
+                    })
+                });
+                
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.error || 'Export failed');
+                }
+                
+                // Create a blob from the response
+                const blob = await response.blob();
+                
+                // Create a download link and trigger it
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `extracted_images.${format}`;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                a.remove();
+                
+            } catch (error) {
+                alert(error.message);
+                console.error(error);
+            } finally {
+                processingOverlay.classList.add('hidden');
+            }
+        }
+    </script>
+</body>
+</html>
