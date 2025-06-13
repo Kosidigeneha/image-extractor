@@ -16,6 +16,10 @@ import tempfile
 import shutil
 from docx2pdf import convert
 import xml.etree.ElementTree as ET
+import sys
+if sys.platform == "win32":
+    import pythoncom
+
 
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
