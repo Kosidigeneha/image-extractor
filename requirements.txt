@@ -1,10 +1,11 @@
-flask
+Flask
 PyMuPDF
 python-docx
 Pillow
 python-pptx
 reportlab
 docx2pdf
-pywin32; sys_platform == 'win32'
+gunicorn
+
 
 
