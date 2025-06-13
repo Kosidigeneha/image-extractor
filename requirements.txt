@@ -1,0 +1,9 @@
+pip install flask PyMuPDF python-docx Pillow python-pptx
+python -m pip install flask PyMuPDF python-docx Pillow python-pptx
+pip install --user flask PyMuPDF python-docx Pillow python-pptx
+pip install flask PyMuPDF python-docx Pillow python-pptx
+pip install PyMuPDF python-docx Pillow
+pip install flask Pillow PyMuPDF python-docx python-pptx reportlab
+pip install pywin32  # for DOC file handling
+pip install Flask PyMuPDF python-docx Pillow python-pptx pywin32
+pip install docx2pdf
