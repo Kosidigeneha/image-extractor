@@ -1,9 +1,9 @@
-flask PyMuPDF python-docx Pillow python-pptx
-flask PyMuPDF python-docx Pillow python-pptx
---user flask PyMuPDF python-docx Pillow python-pptx
-flask PyMuPDF python-docx Pillow python-pptx
-PyMuPDF python-docx Pillow
-flask Pillow PyMuPDF python-docx python-pptx reportlab
-pywin32  # for DOC file handling
-Flask PyMuPDF python-docx Pillow python-pptx pywin32
+flask
+PyMuPDF
+python-docx
+Pillow
+python-pptx
+pywin32
+reportlab
 docx2pdf
+
