@@ -3,7 +3,8 @@ PyMuPDF
 python-docx
 Pillow
 python-pptx
-pywin32
 reportlab
 docx2pdf
+pywin32; sys_platform == 'win32'
+
 
