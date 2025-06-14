@@ -5,7 +5,6 @@ import os
 import fitz  # PyMuPDF for PDF processing
 import docx  # python-docx for DOCX processing
 import io
-import pythoncom 
 from PIL import Image
 from pptx import Presentation
 from pptx.util import Cm
@@ -14,12 +13,11 @@ import zipfile
 import base64
 import tempfile
 import shutil
-#from docx2pdf import convert
 import xml.etree.ElementTree as ET
 
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
-ALLOWED_EXTENSIONS = {'pdf', 'doc', 'docx', 'pptx'}
+ALLOWED_EXTENSIONS = {'pdf', 'pptx'}  # Removed doc/docx support for cross-platform compatibility
 
 @app.route('/static/<path:filename>')
 def static_files(filename):
@@ -63,45 +61,6 @@ def extract_images_from_pptx(pptx_file):
                     continue
     
     return images
-
-"""def convert_docx_to_pdf(docx_file):
-
-    import win32com.client
-    import pythoncom
-    
-    pythoncom.CoInitialize()
-    temp_dir = tempfile.mkdtemp()
-    
-    try:
-        docx_path = os.path.join(temp_dir, 'input.docx')
-        pdf_path = os.path.join(temp_dir, 'output.pdf')
-        
-        with open(docx_path, 'wb') as f:
-            f.write(docx_file.read())
-        docx_file.seek(0)
-        
-        try:
-            word = win32com.client.DispatchEx('Word.Application')
-            doc = word.Documents.Open(docx_path)
-            doc.SaveAs(pdf_path, FileFormat=17)
-            doc.Close()
-            word.Quit()
-        except Exception as e:
-            print(f"COM automation failed: {str(e)}")
-            convert(docx_path, pdf_path)
-        
-        if os.path.exists(pdf_path):
-            pdf_file = open(pdf_path, 'rb')
-            return pdf_file, temp_dir
-        else:
-            raise Exception("PDF conversion failed")
-            
-    except Exception as e:
-        if os.path.exists(temp_dir):
-            shutil.rmtree(temp_dir)
-        raise Exception(f"Failed to convert DOCX to PDF: {str(e)}")
-    finally:
-        pythoncom.CoUninitialize()"""
 
 def extract_images_from_pdf(pdf_file, start_page=None, end_page=None):
     """Extract images from PDF file with optional page range"""
@@ -178,6 +137,7 @@ def extract_images_from_pdf(pdf_file, start_page=None, end_page=None):
         except Exception as e:
             print(f"Error extracting page pixmap from page {page_num + 1}: {str(e)}")
         
+        # Remove duplicates
         seen_data = set()
         unique_images = []
         for img in page_images:
@@ -189,20 +149,8 @@ def extract_images_from_pdf(pdf_file, start_page=None, end_page=None):
     
     return images
 
-"""def extract_images_from_doc(doc_file):
-    
-    pdf_file, temp_dir = convert_docx_to_pdf(doc_file)
-    
-    try:
-        images = extract_images_from_pdf(pdf_file)
-        return images
-    finally:
-        pdf_file.close()
-        if temp_dir and os.path.exists(temp_dir):
-            shutil.rmtree(temp_dir)"""
-
 def get_document_page_count(file, file_type):
-    """Get page count from PDF, DOC, DOCX, or PPTX files"""
+    """Get page count from PDF or PPTX files"""
     if file_type == 'pdf':
         pdf_document = fitz.open(stream=file.read(), filetype="pdf")
         count = len(pdf_document)
@@ -213,18 +161,6 @@ def get_document_page_count(file, file_type):
         count = len(prs.slides)
         file.seek(0)
         return count
-    elif file_type in ['doc', 'docx']:
-        try:
-            pdf_file, temp_dir = convert_docx_to_pdf(file)
-            pdf_document = fitz.open(stream=pdf_file.read(), filetype="pdf")
-            count = len(pdf_document)
-            pdf_file.close()
-            if temp_dir and os.path.exists(temp_dir):
-                shutil.rmtree(temp_dir)
-            file.seek(0)
-            return count
-        except Exception as e:
-            raise Exception(f"Error getting page count: {str(e)}")
     return 1
 
 def calculate_grid_positions(images_per_page):
@@ -318,6 +254,7 @@ def create_pptx(images, images_per_slide):
                 
                 pic = slide.shapes.add_picture(img_io, left, top, width, height)
                 
+                # Maintain aspect ratio
                 if pic.width / pic.height > width / height:
                     new_width = width
                     new_height = width * pic.height / pic.width
@@ -367,7 +304,6 @@ def create_zip(images):
 def index():
     return render_template('index.html')
 
-
 @app.route('/api/get-page-count', methods=['POST'])
 def get_page_count():
     if 'file' not in request.files:
@@ -378,7 +314,7 @@ def get_page_count():
         return jsonify({'error': 'No file selected'}), 400
     
     if not allowed_file(file.filename):
-        return jsonify({'error': 'Invalid file type'}), 400
+        return jsonify({'error': 'Invalid file type. Only PDF and PPTX files are supported.'}), 400
     
     try:
         file_type = file.filename.rsplit('.', 1)[1].lower()
@@ -386,7 +322,6 @@ def get_page_count():
         return jsonify({'pageCount': page_count})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
-
 
 @app.route('/api/extract-images', methods=['POST'])
 def extract_images():
@@ -398,10 +333,7 @@ def extract_images():
         return jsonify({'error': 'No file selected'}), 400
     
     if not allowed_file(file.filename):
-        return jsonify({'error': 'Invalid file type'}), 400
-    
-    temp_dir = None
-    converted_pdf = None
+        return jsonify({'error': 'Invalid file type. Only PDF and PPTX files are supported.'}), 400
     
     try:
         # Get page range from form data
@@ -414,12 +346,12 @@ def extract_images():
         
         file_type = file.filename.rsplit('.', 1)[1].lower()
         
-        if file_type in ['doc', 'docx']:
-            # Convert DOCX to PDF first
-            converted_pdf, temp_dir = convert_docx_to_pdf(file)
-            images = extract_images_from_pdf(converted_pdf, start_page, end_page)
-        else:  # pdf
+        if file_type == 'pdf':
             images = extract_images_from_pdf(file, start_page, end_page)
+        elif file_type == 'pptx':
+            images = extract_images_from_pptx(file)
+        else:
+            return jsonify({'error': 'Unsupported file type'}), 400
         
         if not images:
             return jsonify({'images': []})
@@ -428,12 +360,6 @@ def extract_images():
         
     except Exception as e:
         return jsonify({'error': str(e)}), 500
-    finally:
-        # Clean up temporary files
-        if converted_pdf:
-            converted_pdf.close()
-        if temp_dir and os.path.exists(temp_dir):
-            shutil.rmtree(temp_dir)
 
 @app.route('/api/convert', methods=['POST'])
 def convert_images():
