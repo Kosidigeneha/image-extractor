@@ -14,12 +14,8 @@ import zipfile
 import base64
 import tempfile
 import shutil
-from docx2pdf import convert
+#from docx2pdf import convert
 import xml.etree.ElementTree as ET
-import sys
-if sys.platform == "win32":
-    import pythoncom
-
 
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
@@ -68,8 +64,8 @@ def extract_images_from_pptx(pptx_file):
     
     return images
 
-def convert_docx_to_pdf(docx_file):
-    """Convert DOCX file to PDF using a more robust method"""
+"""def convert_docx_to_pdf(docx_file):
+
     import win32com.client
     import pythoncom
     
@@ -105,7 +101,7 @@ def convert_docx_to_pdf(docx_file):
             shutil.rmtree(temp_dir)
         raise Exception(f"Failed to convert DOCX to PDF: {str(e)}")
     finally:
-        pythoncom.CoUninitialize()
+        pythoncom.CoUninitialize()"""
 
 def extract_images_from_pdf(pdf_file, start_page=None, end_page=None):
     """Extract images from PDF file with optional page range"""
@@ -193,8 +189,8 @@ def extract_images_from_pdf(pdf_file, start_page=None, end_page=None):
     
     return images
 
-def extract_images_from_doc(doc_file):
-    """Extract images from DOC/DOCX file by converting to PDF first"""
+"""def extract_images_from_doc(doc_file):
+    
     pdf_file, temp_dir = convert_docx_to_pdf(doc_file)
     
     try:
@@ -203,7 +199,7 @@ def extract_images_from_doc(doc_file):
     finally:
         pdf_file.close()
         if temp_dir and os.path.exists(temp_dir):
-            shutil.rmtree(temp_dir)
+            shutil.rmtree(temp_dir)"""
 
 def get_document_page_count(file, file_type):
     """Get page count from PDF, DOC, DOCX, or PPTX files"""
