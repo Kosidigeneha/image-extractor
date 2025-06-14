@@ -4,7 +4,6 @@ python-docx
 Pillow
 python-pptx
 reportlab
-docx2pdf
 gunicorn
 
 
